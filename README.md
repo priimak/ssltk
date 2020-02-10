@@ -12,7 +12,8 @@ and you will be prompted with set of questions that you need to answer
 in order to create signed certificate. 
 
 ```
-curl -LO https://raw.githubusercontent.com/priimak/ssltk/master/ssl-cert-maker.sh && chmod 755 ssl-cert-maker.sh
+curl -LO https://raw.githubusercontent.com/priimak/ssltk/master/ssl-cert-maker.sh && \
+  chmod 755 ssl-cert-maker.sh
 ``` 
 
 * This script is written in zsh and thus require it to be installed.
