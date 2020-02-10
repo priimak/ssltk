@@ -31,3 +31,6 @@ existing ones.
 days cert is valid for (default value is 5 years) and a Common Name (CN).
 For self signed certs default value of CN is "`localhost`". No default CN
 is provided for CA certs.
+
+* When creating certificates signed with CA certs Subject Alt Names section
+will be created with just one DNS entry containing provided CN value.
