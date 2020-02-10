@@ -11,6 +11,10 @@ ssl certificates using sensible defaults. Just run this utility
 and you will be prompted with set of questions that you need to answer
 in order to create signed certificate. 
 
+```
+curl -LO https://raw.githubusercontent.com/priimak/ssltk/master/ssl-cert-maker.sh
+``` 
+
 * This script is written in zsh and thus require it to be installed.
 Internally it uses `openssl` and `expect` command line tools.
 
