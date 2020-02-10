@@ -1,7 +1,5 @@
 #!/usr/bin/env zsh
 
-set -e
-
 function good_by() {
 	print -u 2 "Exiting... Good by;"
 	exit 1
