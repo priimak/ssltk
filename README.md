@@ -16,14 +16,14 @@ Internally it uses `openssl` and `expect` command line tools.
 
 * The script was tested under ubuntu 18.04LTS.
 
-* Certificates will be written under ~/.ssl/certs and CA signing certs
-under ~/.ssl/ca
+* Certificates will be written under `~/.ssl/certs` and CA signing certs
+under `~/.ssl/ca`
  
-* When creating properly signed certificates ssl-cert-maker.sh can 
+* When creating properly signed certificates `ssl-cert-maker.sh` can 
 create Certeficate Authority (CA) signing certificates or reuse 
 existing ones.
 
 * There are only two options that user can set on certificates, number of
 days cert is valid for (default value is 5 years) and a Common Name (CN).
-For self signed certs default value of CN is "localhost". No default CN
+For self signed certs default value of CN is "`localhost`". No default CN
 is provided for CA certs.
