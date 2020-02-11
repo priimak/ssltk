@@ -73,16 +73,24 @@ function check_prereq() {
 }
 
 function prompt_for_main_action() {
-	local create
-	while true; do
-		vared -p "Do you want to create cert (1) self signed or (2) signed by CA cert: " create
-		if [[ "$create" =~ "[12]" ]]; then
-			echo "$create"
-			break
-		else
-			create=""
-		fi
-	done
+	local cli_supplied_action=$1
+	if [[ -z "$cli_supplied_action" ]]; then
+		local create
+		while true; do
+			vared -p "Do you want to create cert (1) self signed or (2) signed by CA cert: " create
+			if [[ "$create" =~ "[12]" ]]; then
+				echo "$create"
+				break
+			else
+				create=""
+			fi
+		done
+	elif [[ "$cli_supplied_action" =~ "[12]" ]]; then
+		echo "$cli_supplied_action"
+	else
+		print -u 2 "Error: Invalid main action requested"
+		return 1
+	fi
 }
 
 function ask_for_positive_number() {
@@ -312,10 +320,6 @@ function do_create_cert_signed_by_ca_cert() {
 	local cn=$3
 	local days_valid=$4
 
-	echo "ca_base_name $ca_base_name"
-	echo "cert_file_base_name $cert_file_base_name"
-	echo "cn $cn"
-
         rm -rf $HOME/.ssl/workspace
         mkdir -p $HOME/.ssl/workspace
 
@@ -337,6 +341,12 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = $cn
 EOF
+
+        print "\nCertificate subject alt names is set to provided CN only"
+	print "You can cange it by manually editing generated extention file"
+        if yes_or_No "Do you want to edit extention file to add or change alt_names?"; then
+		vim $HOME/.ssl/workspace/ext
+	fi
 
 	openssl x509 -req -in $HOME/.ssl/workspace/$cert_file_base_name.csr \
 		-CA $HOME/.ssl/ca/$ca_base_name.crt -CAkey $HOME/.ssl/ca/$ca_base_name.key -CAcreateserial \
@@ -391,7 +401,8 @@ check_prereq
 mkdir -p ~/.ssl/ca
 mkdir -p ~/.ssl/certs
 
-action=$(prompt_for_main_action)
+cli_action=$1
+action=$(prompt_for_main_action $cli_action) || good_by
 case $action in
 	"1")
 		create_self_signed_cert
