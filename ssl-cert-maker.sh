@@ -1,7 +1,9 @@
 #!/usr/bin/env zsh
 
+ACCEPT_EXT_AS_IS=""
+
 function good_by() {
-	print -u 2 "Exiting... Good by;"
+	print -u 2 "Exiting... Good by"
 	exit 1
 }
 
@@ -77,15 +79,19 @@ function prompt_for_main_action() {
 	if [[ -z "$cli_supplied_action" ]]; then
 		local create
 		while true; do
-			vared -p "Do you want to create cert (1) self signed or (2) signed by CA cert: " create
-			if [[ "$create" =~ "[12]" ]]; then
+			print -u 2 "Do you want to create:"
+			print -u 2 "\t1) self signed certificate"
+			print -u 2 "\t2) cert signed by CA cert"
+			print -u 2 "\t3) signing CA cert"
+			vared -p "Please select one option: " create
+			if [[ "$create" =~ "[123]" ]]; then
 				echo "$create"
 				break
 			else
 				create=""
 			fi
 		done
-	elif [[ "$cli_supplied_action" =~ "[12]" ]]; then
+	elif [[ "$cli_supplied_action" =~ "[123]" ]]; then
 		echo "$cli_supplied_action"
 	else
 		print -u 2 "Error: Invalid main action requested"
@@ -192,9 +198,29 @@ function get_validity_duration() {
 }
 
 function create_new_ca_signing_cert() {
-	local cn=$(get_signing_cert_cn | tail -1)
-        local days_valid=$(get_validity_duration | tail -1)
+	local cli_cn=$1
+        local cli_duration=$2
+
+	local cn
+        if [[ -z "$cli_cn" ]]; then
+                cn=$(get_signing_cert_cn | tail -1)
+        else
+                cn=$cli_cn
+        fi
+
+        local days_valid
+        if [[ -z "$cli_duration" ]]; then
+                days_valid=$(get_validity_duration | tail -1)
+        else
+                days_valid=$cli_duration
+        fi
+
 	local cert_file_base_name=$(echo $cn | tr ' ' '_' | tr "\t" '_')
+	if [[ ! -z "$cli_cn" ]] && [[ -f "$HOME/.ssl/ca/ca.$cert_file_base_name.crt" ]]; then
+		print -u 2 "Error: CA certificate with this CN already exists"
+		good_by
+		return
+	fi
 	rm -rf $HOME/.ssl/workspace
 	mkdir -p $HOME/.ssl/workspace
 	cat<<EOF | expect -f -
@@ -240,15 +266,27 @@ EOF
 		-subj "/C=US/ST=California/L=San Francisco/O=Internet of All Things Ltd/OU=Command And Control/CN=$cn"
 
         if [[ -f "$HOME/.ssl/ca/ca.$cert_file_base_name.crt" ]]; then
-                print -u 2 "Generated CA signing cert $HOME/.ssl/ca/ca.$cert_file_base_name.crt file"
+                print -u 2 "\nGenerated CA signing cert $HOME/.ssl/ca/ca.$cert_file_base_name.crt file"
         else
-                print -u 2 "Error: Failed to generte $HOME/.ssl/ca/ca.$cert_file_base_name.crt file"
+                print -u 2 "\nError: Failed to generte $HOME/.ssl/ca/ca.$cert_file_base_name.crt file"
                 return 1
         fi
 	echo "ca.$cert_file_base_name"
 }
 
 function get_ca_cert() {
+	local cli_ca_cn=$1
+	if [[ ! -z "$cli_ca_cn" ]] ; then
+		if [[ -f "$HOME/.ssl/ca/ca.$cli_ca_cn.crt" ]]; then
+			echo "ca.$cli_ca_cn"
+			return
+		else
+			print -u 2 "Error: Could not find CA cert for this CN $cli_ca_cn"
+			return 1
+		fi
+
+	fi
+
 	setopt null_glob
 	local ca_certs=("Create new CA cert" $HOME/.ssl/ca/ca.*.crt)
 	if [ "${#ca_certs[@]}" -eq 0 ]; then
@@ -285,13 +323,31 @@ function get_ca_cert() {
 }
 
 function create_self_signed_cert() {
-	local cn=$(get_cn | tail -1)
-	local days_valid=$(get_validity_duration | tail -1)
+	local cli_cn=$1
+	local cli_duration=$2
+
+	local cn
+	if [[ -z "$cli_cn" ]]; then
+		cn=$(get_cn | tail -1)
+	else
+		cn=$cli_cn
+	fi
+
+	local days_valid
+	if [[ -z "$cli_duration" ]]; then
+		day_valid=$(get_validity_duration | tail -1)
+	else
+		days_valid=$cli_duration
+	fi
 	local cert_file_base_name=$(echo $cn | tr ' ' '_' | tr "\t" '_')
 
 	while true; do
 		if [[ -f "$HOME/.ssl/certs/$cert_file_base_name.crt" ]]; then
 			print "\nCertificate for this CN already exist $HOME/.ssl/certs/$cn.crt"
+			if [[ ! -z "$cli_cn" ]]; then
+				good_by
+				break
+			fi
 			if yes_or_No "Do you want to override it"; then
 				remove_existing_cert $cert_file_base_name
 				do_create_self_signed_cert $cert_file_base_name $cn $days_valid
@@ -326,7 +382,6 @@ function do_create_cert_signed_by_ca_cert() {
 	# make certificate key 
 	openssl genrsa -out $HOME/.ssl/certs/$cert_file_base_name.key 2048
 
-
 	# make certificate signing request (csr)
 	openssl req -new -key $HOME/.ssl/certs/$cert_file_base_name.key \
 		-out $HOME/.ssl/workspace/$cert_file_base_name.csr \
@@ -342,10 +397,12 @@ subjectAltName = @alt_names
 DNS.1 = $cn
 EOF
 
-        print "\nCertificate subject alt names is set to provided CN only"
-	print "You can cange it by manually editing generated extention file"
-        if yes_or_No "Do you want to edit extention file to add or change alt_names?"; then
-		vim $HOME/.ssl/workspace/ext
+	if [[ -z "$ACCEPT_EXT_AS_IS" ]]; then
+		print "\nCertificate subject alt names is set to provided CN only"
+		print "You can cange it by manually editing generated extention file"
+		if yes_or_No "Do you want to edit extention file to add or change alt_names?"; then
+			vim $HOME/.ssl/workspace/ext
+		fi
 	fi
 
 	openssl x509 -req -in $HOME/.ssl/workspace/$cert_file_base_name.csr \
@@ -366,19 +423,39 @@ EOF
 }
 
 function create_cert_signed_by_ca_cert() {
+	local cli_ca_cn=$1
+	local cli_cn=$2
+	local cli_duration=$3
+
 	local res
-	res=$(get_ca_cert) || good_by
+	res=$(get_ca_cert $cli_ca_cn) || good_by
 	local ca_base_name=$(echo $res | tail -1)
 
 	print "\nNew certificate will be created signed by $ca_base_name.crt"
-        local cn=$(get_cn | tail -1)
-        local days_valid=$(get_validity_duration | tail -1)
+	
+	local cn
+	if [[ -z "$cli_cn" ]]; then
+		cn=$(get_cn | tail -1)
+	else
+		ACCEPT_EXT_AS_IS="true"
+		cn=$cli_cn
+	fi
+
+	local days_valid
+	if [[ -z "$cli_duration" ]]; then
+		days_valid=$(get_validity_duration | tail -1)
+	else
+		days_valid=$cli_duration
+	fi
+	
         local cert_file_base_name=$(echo $cn | tr ' ' '_' | tr "\t" '_')
 
         while true; do
                 if [[ -f "$HOME/.ssl/certs/$cert_file_base_name.crt" ]]; then
                         print "\nCertificate for this CN already exist $HOME/.ssl/certs/$cn.crt"
-                        if yes_or_No "Do you want to override it"; then
+			if [[ ! -z "$cli_cn" ]]; then
+				good_by
+			elif yes_or_No "Do you want to override it"; then
                                 remove_existing_cert $cert_file_base_name
                                 do_create_cert_signed_by_ca_cert $ca_base_name $cert_file_base_name $cn $days_valid
                                 break
@@ -402,12 +479,42 @@ mkdir -p ~/.ssl/ca
 mkdir -p ~/.ssl/certs
 
 cli_action=$1
-action=$(prompt_for_main_action $cli_action) || good_by
+if [[ -z "$cli_action" ]]; then
+	action=$(prompt_for_main_action $cli_action) || good_by
+else
+	action=$cli_action
+fi
 case $action in
-	"1")
-		create_self_signed_cert
+	1|new_self_signed_cert)
+		cli_cn=$2
+		cli_days_valid=$3
+		create_self_signed_cert $cli_cn $cli_days_valid
 		;;
-	"2")
-		create_cert_signed_by_ca_cert
+
+	2|new_signed_cert)
+		cli_ca_cn=$2
+		cli_cn=$3
+		cli_days_valid=$4
+		create_cert_signed_by_ca_cert $cli_ca_cn $cli_cn $cli_days_valid
+		;;
+
+	3|new_ca_cert)
+                cli_cn=$2
+                cli_days_valid=$3
+		create_new_ca_signing_cert $cli_cn $cli_days_valid > /dev/null
+		;;
+
+	help)
+		cat<<EOF
+Make ssl certificates. Run it without any options and you
+will be prompted with questions needed to create ssl certs or
+or supply it with command line parameters as shown below
+to create certs in unsupervised fashion.
+
+    ssl-cert-maker.sh new_self_signed_cert <cn> <days_valid>
+    ssl-cert-maker.sh new_signed_cert <ca_cn> <cn> <days_valid>
+    ssl-cert-maker.sh new_ca_cert <cn> <days_valid>
+
+EOF
 		;;
 esac
