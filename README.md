@@ -43,14 +43,21 @@ command line parameters.
 
 ```
 $ ./ssl-cert-maker.sh help
-Make ssl certificates. Run it without any options and you
-will be prompted with questions needed to create ssl certs or
-or supply it with command line parameters as shown below
-to create certs in unsupervised fashion.
+Make ssl certificates. Run it without any options and you will be
+prompted with questions needed to create ssl certs or or supply
+it with command line parameters as shown below to create certs in
+unsupervised fashion.
 
     ssl-cert-maker.sh new_self_signed_cert <cn> <days_valid>
-    ssl-cert-maker.sh new_signed_cert <ca_cn> <cn> <days_valid>
+    ssl-cert-maker.sh new_signed_cert <ca_cn> <cn> <days_valid> [--subjectAltName=<name_or_ip_addr> ...]
     ssl-cert-maker.sh new_ca_cert <cn> <days_valid>
+
+When creating new signed certifcate in attanded mode Subject
+Altrenative Name (SAN) is set to provided CN unless --subjectAltName=
+command line parameters are used. If they SANs are provided on
+command line then only the explictly provided values will in the
+certificate. Note that script can correctly distinguish between ip
+addresses and names passed as SANs.
 ```
 
 Below is example where we create new CA cert and another cert signed with this

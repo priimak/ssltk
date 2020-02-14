@@ -2,6 +2,9 @@
 
 ACCEPT_EXT_AS_IS=""
 
+san_names=()
+san_ips=()
+
 function good_by() {
 	print -u 2 "Exiting... Good by"
 	exit 1
@@ -335,7 +338,7 @@ function create_self_signed_cert() {
 
 	local days_valid
 	if [[ -z "$cli_duration" ]]; then
-		day_valid=$(get_validity_duration | tail -1)
+		days_valid=$(get_validity_duration | tail -1)
 	else
 		days_valid=$cli_duration
 	fi
@@ -394,14 +397,29 @@ keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1 = $cn
 EOF
 
-	if [[ -z "$ACCEPT_EXT_AS_IS" ]]; then
-		print "\nCertificate subject alt names is set to provided CN only"
-		print "You can cange it by manually editing generated extention file"
-		if yes_or_No "Do you want to edit extention file to add or change alt_names?"; then
-			vim $HOME/.ssl/workspace/ext
+	if [[ -z "$san_names" ]] && [[ -z "$san_ips" ]]; then
+		echo "DNS.1 = $cn" >> $HOME/.ssl/workspace/ext
+
+		if [[ -z "$ACCEPT_EXT_AS_IS" ]]; then
+			print "\nCertificate subject alt names is set to provided CN only"
+			print "You can cange it by manually editing generated extention file"
+			if yes_or_No "Do you want to edit extention file to add or change alt_names?"; then
+				vim $HOME/.ssl/workspace/ext
+			fi
+		fi
+
+	else
+		if [[ ! -z "$san_names" ]]; then
+	        	for i in {1..${#san_names}}; do
+                		echo "DNS.$i = $san_names[$i]" >> $HOME/.ssl/workspace/ext
+        		done
+		fi
+		if [[ ! -z "$san_ips" ]]; then
+			for i in {1..${#san_ips}}; do
+				echo "IP.$i = $san_ips[$i]" >> $HOME/.ssl/workspace/ext
+			done
 		fi
 	fi
 
@@ -474,6 +492,19 @@ function create_cert_signed_by_ca_cert() {
         done
 }
 
+function parse_cli_args_for_signed_cert() {
+	for i in $@; do
+		if [[ "$i" =~ "^--subjectAltName=.+$" ]]; then
+			local san=${i[18,1000]}
+			if [[ "$san" =~ ^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$ ]]; then
+				san_ips+=$san
+			else
+				san_names+=$san
+			fi
+		fi
+	done
+}
+
 check_prereq
 mkdir -p ~/.ssl/ca
 mkdir -p ~/.ssl/certs
@@ -492,6 +523,7 @@ case $action in
 		;;
 
 	2|new_signed_cert)
+		parse_cli_args_for_signed_cert $@
 		cli_ca_cn=$2
 		cli_cn=$3
 		cli_days_valid=$4
@@ -506,14 +538,21 @@ case $action in
 
 	help)
 		cat<<EOF
-Make ssl certificates. Run it without any options and you
-will be prompted with questions needed to create ssl certs or
-or supply it with command line parameters as shown below
-to create certs in unsupervised fashion.
+Make ssl certificates. Run it without any options and you will be
+prompted with questions needed to create ssl certs or or supply
+it with command line parameters as shown below to create certs in
+unsupervised fashion.
 
     ssl-cert-maker.sh new_self_signed_cert <cn> <days_valid>
-    ssl-cert-maker.sh new_signed_cert <ca_cn> <cn> <days_valid>
+    ssl-cert-maker.sh new_signed_cert <ca_cn> <cn> <days_valid> [--subjectAltName=<name_or_ip_addr> ...]
     ssl-cert-maker.sh new_ca_cert <cn> <days_valid>
+
+When creating new signed certifcate in attanded mode Subject
+Altrenative Name (SAN) is set to provided CN unless --subjectAltName=
+command line parameters are used. If they SANs are provided on
+command line then only the explictly provided values will in the
+certificate. Note that script can correctly distinguish between ip
+addresses and names passed as SANs.
 
 EOF
 		;;
