@@ -34,7 +34,9 @@ For self signed certs default value of CN is "`localhost`". No default CN
 is provided for CA certs.
 
 * When creating certificates signed with CA certs Subject Alt Names section
-will be created with just one DNS entry containing provided CN value.
+will be created with just one DNS entry containing provided CN value unless
+overriden by editing extention file or --subjectAltName=$name_or_ip_addr
+arguments provided on command line
 
 * Can be run in mode without asking any questions which can be done by passing
 command line parameters.
