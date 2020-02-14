@@ -99,14 +99,17 @@ Please provide Common Name (CN) for this cert [localhost]: www.my.cool.site.com
 Every certificate has validity period defined in days from the moment
 when it was created. Once cert is created validity period cannot be changed
 How many days do you want the certificate to be valid for [1825]: 30
+
+Certificate for this CN already exist /home/priimak/.ssl/certs/www.my.cool.site.com.crt
+Do you want to override it [y/N]: y
 Generating RSA private key, 2048 bit long modulus (2 primes)
-....................................................................................+++++
-...............................................................................................................................................+++++
+..................+++++
+...............+++++
 e is 65537 (0x010001)
 
 Certificate subject alt names is set to provided CN only
 You can cange it by manually editing generated extention file
-Do you want to edit extention file to add or change alt_names? [y/N]: 
+Do you want to edit extention file to add or change alt_names? [y/N]: N
 Signature ok
 subject=C = US, ST = California, L = San Francisco, O = Internet of All Things Ltd, OU = Command And Control, CN = www.my.cool.site.com
 Getting CA Private Key
