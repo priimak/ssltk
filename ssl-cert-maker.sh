@@ -69,6 +69,18 @@ function check_prereq() {
 		print "Error: command line tool 'openssl' is not installed."
 		install_openssl
 	fi
+	local openssl_major_version=$(openssl version | awk '/OpenSSL/ { print $2 }' | awk -F. '{ print $1 }')
+	local openssl_minor_version=$(openssl version | awk '/OpenSSL/ { print $2 }' | awk -F. '{ print $2 }')
+	if [[ -z "$openssl_major_version" ]] || [[ -z "$openssl_minor_version" ]]; then
+		print "Error: unable to determine OpenSSL version. Please check that you have OpenSSL installed"
+		print "Found version: " $(openssl version)
+		exit 1
+	fi
+	if [ $openssl_major_version -lt 1 ] || [ $openssl_minor_version -lt 1 ]; then
+		print "Error: only OpenSSL version 1.1.* or greater are supported"
+		print "Found version: " $(openssl version)
+		exit 1
+	fi
 
         which expect > /dev/null 
         if [ $? -ne 0 ]; then
